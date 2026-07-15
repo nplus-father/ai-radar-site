@@ -12,6 +12,8 @@ const weekly = (await getCollection('weekly')).sort(
 ---
 
 <Base title="AI Radar — 每日 AI 情報">
+  <p class="dash-link"><a href={`${base}dashboard/`}>📊 系統健康 — 佇列深度、LLM 花費與 DLQ</a></p>
+
   <h2>每日精選</h2>
   <ul class="index">
     {
@@ -38,3 +40,10 @@ const weekly = (await getCollection('weekly')).sort(
     {weekly.length === 0 && <li><span>尚無資料</span></li>}
   </ul>
 </Base>
+
+<style>
+  .dash-link {
+    margin: 0 0 -0.5rem;
+    font-size: 0.9rem;
+  }
+</style>
