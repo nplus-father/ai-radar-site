@@ -23,12 +23,32 @@ const weekly = defineCollection({
 });
 
 // news-echo：每日一篇書櫃評析（可缺席——「有共鳴才寫」是合法輸出）。
+// news/books 由 pipeline 的 EssayRenderer 寫進 frontmatter（結構化三元組）；全
+// optional，讓改版前、無這些欄位的舊 essay 仍能通過驗證並優雅降級。
 const essays = defineCollection({
   loader: glob({ pattern: '*.md', base: './content/essays' }),
   schema: z.object({
     title: z.string(),
     date: z.coerce.date(),
     kind: z.string().optional(),
+    news: z
+      .object({
+        title: z.string(),
+        url: z.string(),
+        source: z.string().optional(),
+        summary: z.string().optional(),
+      })
+      .optional(),
+    // slug == library book id == 已發佈書站路徑 nplus.wiki/<slug>/。
+    books: z
+      .array(
+        z.object({
+          title: z.string(),
+          chapter: z.string().optional(),
+          slug: z.string().optional(),
+        }),
+      )
+      .optional(),
   }),
 });
 

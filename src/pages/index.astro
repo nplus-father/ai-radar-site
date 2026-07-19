@@ -1,65 +1,36 @@
 ---
-import { getCollection } from 'astro:content';
+import { getCollection, render } from 'astro:content';
 import Base from '../layouts/Base.astro';
+import EssayHeader from '../components/EssayHeader.astro';
+import NewsDigest from '../components/NewsDigest.astro';
 
 const base = import.meta.env.BASE_URL;
-const daily = (await getCollection('daily')).sort(
-  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-);
-const weekly = (await getCollection('weekly')).sort(
-  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-);
+// Homepage = the most recent essay in full. Not "today" — a day without an
+// essay is legal (寧缺勿濫), so we never open a hole; we show the latest one.
 const essays = (await getCollection('essays')).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime(),
 );
+const latest = essays[0];
+const Content = latest ? (await render(latest)).Content : null;
 ---
 
-<Base title="Bookshelf Echo — 書櫃與每日新聞的共鳴">
-  <p class="dash-link"><a href={`${base}dashboard/`}>📊 系統健康 — 佇列深度、LLM 花費與 DLQ</a></p>
-
-  <h2>書櫃評析</h2>
-  <ul class="index">
-    {
-      essays.map((e) => (
-        <li>
-          <a href={`${base}essays/${e.id}/`}>{e.data.title}</a>
-          <span>{e.data.date.toISOString().slice(0, 10)}</span>
-        </li>
-      ))
-    }
-    {essays.length === 0 && <li><span>尚無評析 — 書櫃有話可說的那天會自動出現</span></li>}
-  </ul>
-
-  <h2>每日精選</h2>
-  <ul class="index">
-    {
-      daily.map((d) => (
-        <li>
-          <a href={`${base}daily/${d.id}/`}>{d.data.title}</a>
-          {d.data.itemCount ? <span>{d.data.itemCount} 篇</span> : null}
-        </li>
-      ))
-    }
-    {daily.length === 0 && <li><span>尚無資料 — pipeline 產出後會自動出現</span></li>}
-  </ul>
-
-  <h2>每週回顧</h2>
-  <ul class="index">
-    {
-      weekly.map((w) => (
-        <li>
-          <a href={`${base}weekly/${w.id}/`}>{w.data.title}</a>
-          {w.data.highlightCount ? <span>{w.data.highlightCount} 精選</span> : null}
-        </li>
-      ))
-    }
-    {weekly.length === 0 && <li><span>尚無資料</span></li>}
-  </ul>
-</Base>
-
-<style>
-  .dash-link {
-    margin: 0 0 -0.5rem;
-    font-size: 0.9rem;
+<Base title={latest ? latest.data.title : 'Bookshelf Echo'}>
+  {
+    latest && Content ? (
+      <>
+        <EssayHeader data={latest.data} />
+        <article>
+          <Content />
+        </article>
+        <nav class="prev-next">
+          <span />
+          <a href={`${base}archive/`}>All essays →</a>
+        </nav>
+      </>
+    ) : (
+      <p>No essay yet — one appears on the day the shelf has something to say.</p>
+    )
   }
-</style>
+
+  <NewsDigest />
+</Base>

@@ -1,0 +1,48 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const base = import.meta.env.BASE_URL;
+const essays = (await getCollection('essays')).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+---
+
+<Base title="Archive — Bookshelf Echo">
+  <h1>Archive</h1>
+  <ul class="archive-list">
+    {
+      essays.map((e) => (
+        <li class="archive-item">
+          <span class="a-date">{e.data.date.toISOString().slice(0, 10)}</span>
+          <a class="a-title" href={`${base}essays/${e.id}/`}>
+            {e.data.title}
+          </a>
+          <p class="a-meta">
+            {e.data.news && (
+              <>
+                In response to{' '}
+                <a href={e.data.news.url} target="_blank" rel="noopener noreferrer">
+                  {e.data.news.title}
+                </a>
+                {e.data.books && e.data.books.length > 0 ? ' · ' : ''}
+              </>
+            )}
+            {e.data.books && e.data.books.length > 0 && (
+              <>
+                Books:{' '}
+                {e.data.books.map((b, i) => (
+                  <>
+                    {i > 0 ? ', ' : ''}
+                    <a href={`${base}books/${b.slug ? `#${b.slug}` : ''}`}>{b.title}</a>
+                  </>
+                ))}
+              </>
+            )}
+          </p>
+        </li>
+      ))
+    }
+    {essays.length === 0 && <li>No essays yet.</li>}
+  </ul>
+</Base>

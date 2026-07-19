@@ -1,0 +1,48 @@
+---
+import { getCollection } from 'astro:content';
+import { parseDigest } from '../lib/digest';
+
+// The day's wider news, condensed — context around the one story the essay
+// answered. Reuses the latest daily digest the pipeline already produces.
+const daily = (await getCollection('daily')).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+const latest = daily[0];
+const { highlights, alsoSeen } = latest ? parseDigest(latest.body ?? '') : { highlights: [], alsoSeen: [] };
+const day = latest ? latest.data.date.toISOString().slice(0, 10) : null;
+---
+
+{
+  latest && highlights.length > 0 && (
+    <section class="news-digest">
+      <div class="section-head">
+        <h2>News Digest</h2>
+        <span class="digest-date">{day}</span>
+      </div>
+      <ul class="digest-list">
+        {highlights.map((h) => (
+          <li>
+            <a href={h.url} target="_blank" rel="noopener noreferrer">
+              {h.title}
+            </a>
+            {h.summaryEn && <p class="digest-summary">{h.summaryEn}</p>}
+          </li>
+        ))}
+      </ul>
+      {alsoSeen.length > 0 && (
+        <details class="digest-also">
+          <summary>Also seen ({alsoSeen.length})</summary>
+          <ul>
+            {alsoSeen.map((a) => (
+              <li>
+                <a href={a.url} target="_blank" rel="noopener noreferrer">
+                  {a.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  )
+}

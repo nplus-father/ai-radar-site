@@ -1,20 +1,31 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import EssayHeader from '../../components/EssayHeader.astro';
 
 export async function getStaticPaths() {
-  const essays = await getCollection('essays');
-  return essays.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+  const essays = (await getCollection('essays')).sort(
+    (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+  );
+  return essays.map((entry, i) => ({
+    params: { slug: entry.id },
+    // Array is newest-first: i-1 is newer, i+1 is older.
+    props: { entry, newer: essays[i - 1] ?? null, older: essays[i + 1] ?? null },
+  }));
 }
 
-const { entry } = Astro.props;
+const { entry, newer, older } = Astro.props;
 const { Content } = await render(entry);
 const base = import.meta.env.BASE_URL;
 ---
 
 <Base title={entry.data.title}>
-  <p><a class="back" href={base}>← 回首頁</a></p>
+  <EssayHeader data={entry.data} />
   <article>
     <Content />
   </article>
+  <nav class="prev-next">
+    {newer ? <a href={`${base}essays/${newer.id}/`}>← {newer.data.title}</a> : <span />}
+    {older ? <a href={`${base}essays/${older.id}/`}>{older.data.title} →</a> : <span />}
+  </nav>
 </Base>

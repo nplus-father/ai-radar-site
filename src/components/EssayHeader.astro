@@ -1,0 +1,48 @@
+---
+import BookCard from './BookCard.astro';
+import type { EssayBook } from '../lib/library';
+
+interface Props {
+  data: {
+    title: string;
+    date: Date;
+    news?: { title: string; url: string; source?: string; summary?: string };
+    books?: EssayBook[];
+  };
+}
+const { data } = Astro.props;
+const day = data.date.toISOString().slice(0, 10);
+const books = data.books ?? [];
+---
+
+<header class="essay-header">
+  {
+    data.news && (
+      <p class="news-response">
+        <span class="triplet-label">In response to</span>
+        <a href={data.news.url} target="_blank" rel="noopener noreferrer">
+          {data.news.title}
+        </a>
+        {data.news.source && <span class="news-source">({data.news.source})</span>}
+      </p>
+    )
+  }
+
+  <h1>{data.title}</h1>
+  <p class="essay-meta">{day} · AI-written, reviewed by judge + critic</p>
+
+  {data.news?.summary && <blockquote class="news-summary">{data.news.summary}</blockquote>}
+
+  {
+    books.length > 0 && (
+      <div class="books-cited">
+        <span class="triplet-label">Books cited</span>
+        <div class="book-list">
+          {books.map((b) => (
+            <BookCard book={b} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+</header>

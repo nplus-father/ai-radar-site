@@ -1,0 +1,69 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { bookSiteUrl, bookCoverUrl } from '../lib/library';
+
+const base = import.meta.env.BASE_URL;
+const essays = (await getCollection('essays')).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+
+// This is the site's signature view: the shelf indexed by what it has answered.
+// Group every cited book (by slug, or title when a book has no published site)
+// and list the essays that drew on it.
+type Agg = { title: string; slug?: string; essays: { id: string; title: string; date: string }[] };
+const byKey = new Map<string, Agg>();
+for (const e of essays) {
+  for (const b of e.data.books ?? []) {
+    const key = b.slug ?? b.title;
+    const agg = byKey.get(key) ?? { title: b.title, slug: b.slug, essays: [] };
+    agg.essays.push({ id: e.id, title: e.data.title, date: e.data.date.toISOString().slice(0, 10) });
+    byKey.set(key, agg);
+  }
+}
+const books = [...byKey.values()].sort(
+  (a, b) => b.essays.length - a.essays.length || a.title.localeCompare(b.title),
+);
+---
+
+<Base title="Books — Bookshelf Echo">
+  <h1>Books</h1>
+  <p class="essay-meta">How the shelf has answered the news, grouped by book.</p>
+  <ul class="book-index">
+    {
+      books.map((bk) => (
+        <li id={bk.slug}>
+          {bk.slug && (
+            <a href={bookSiteUrl(bk.slug)} target="_blank" rel="noopener noreferrer">
+              <img
+                class="bi-cover"
+                src={bookCoverUrl(bk.slug)}
+                alt={`Cover of ${bk.title}`}
+                loading="lazy"
+                onerror="this.remove();"
+              />
+            </a>
+          )}
+          <div class="bi-body">
+            {bk.slug ? (
+              <a class="bi-title" href={bookSiteUrl(bk.slug)} target="_blank" rel="noopener noreferrer">
+                {bk.title}
+              </a>
+            ) : (
+              <span class="bi-title">{bk.title}</span>
+            )}
+            <ul class="bi-essays">
+              {bk.essays.map((e) => (
+                <li>
+                  <span class="e-date">{e.date}</span>
+                  <a href={`${base}essays/${e.id}/`}>{e.title}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </li>
+      ))
+    }
+    {books.length === 0 && <li>No books cited yet.</li>}
+  </ul>
+</Base>

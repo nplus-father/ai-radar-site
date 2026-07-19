@@ -1,0 +1,40 @@
+---
+import { bookSiteUrl, bookCoverUrl, type EssayBook } from '../lib/library';
+
+interface Props {
+  book: EssayBook;
+}
+const { book } = Astro.props;
+// slug drives everything; without it the book still shows, just unlinked and
+// coverless (book indexed in the library but not yet published as a site).
+const href = book.slug ? bookSiteUrl(book.slug) : null;
+const cover = book.slug ? bookCoverUrl(book.slug) : null;
+---
+
+<div class="book-card">
+  {
+    cover && href && (
+      <a class="book-cover-link" href={href} target="_blank" rel="noopener noreferrer">
+        <img
+          class="book-cover"
+          src={cover}
+          alt={`Cover of ${book.title}`}
+          loading="lazy"
+          onerror="this.closest('.book-card')?.classList.add('no-cover'); this.remove();"
+        />
+      </a>
+    )
+  }
+  <div class="book-meta">
+    {
+      href ? (
+        <a class="book-title" href={href} target="_blank" rel="noopener noreferrer">
+          {book.title}
+        </a>
+      ) : (
+        <span class="book-title">{book.title}</span>
+      )
+    }
+    {book.chapter && <span class="book-chapter">{book.chapter}</span>}
+  </div>
+</div>
