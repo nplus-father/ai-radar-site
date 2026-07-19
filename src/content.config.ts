@@ -46,6 +46,7 @@ const essays = defineCollection({
           title: z.string(),
           chapter: z.string().optional(),
           slug: z.string().optional(),
+          chapter_id: z.string().optional(),
         }),
       )
       .optional(),

@@ -13,17 +13,23 @@ interface Props {
 const { data } = Astro.props;
 const day = data.date.toISOString().slice(0, 10);
 const books = data.books ?? [];
+// Only attribute a real outlet (e.g. "Guardian"); the generic "news" source
+// type is noise, so it is dropped rather than shown as "(news)".
+const src = data.news?.source?.trim();
+const outlet = src && !['news', 'rss', ''].includes(src.toLowerCase())
+  ? src.charAt(0).toUpperCase() + src.slice(1)
+  : null;
 ---
 
 <header class="essay-header">
   {
     data.news && (
       <p class="news-response">
-        <span class="triplet-label">In response to</span>
+        <span class="triplet-label">In response to the news</span>
         <a href={data.news.url} target="_blank" rel="noopener noreferrer">
           {data.news.title}
         </a>
-        {data.news.source && <span class="news-source">({data.news.source})</span>}
+        {outlet && <span class="news-source">({outlet})</span>}
       </p>
     )
   }
