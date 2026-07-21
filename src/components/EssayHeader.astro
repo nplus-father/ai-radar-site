@@ -6,6 +6,7 @@ interface Props {
   data: {
     title: string;
     date: Date;
+    model?: string;
     news?: { title: string; url: string; source?: string; summary?: string };
     books?: EssayBook[];
   };
@@ -19,6 +20,10 @@ const src = data.news?.source?.trim();
 const outlet = src && !['news', 'rss', ''].includes(src.toLowerCase())
   ? src.charAt(0).toUpperCase() + src.slice(1)
   : null;
+// Essays written before the model was recorded fall back to the generic
+// attribution rather than claiming a model we cannot verify.
+const model = data.model?.trim();
+const byline = model ? `Written by ${model}` : 'AI-written';
 ---
 
 <header class="essay-header">
@@ -35,7 +40,7 @@ const outlet = src && !['news', 'rss', ''].includes(src.toLowerCase())
   }
 
   <h1>{data.title}</h1>
-  <p class="essay-meta">{day} · AI-written, reviewed by judge + critic</p>
+  <p class="essay-meta">{day} · {byline}, reviewed by judge + critic</p>
 
   {data.news?.summary && <blockquote class="news-summary">{data.news.summary}</blockquote>}
 

@@ -1,21 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
-import fs from 'node:fs';
-import path from 'node:path';
+import { loadSnapshot, snapshotAge, humanAge } from '../lib/snapshot';
 
 const base = import.meta.env.BASE_URL;
 
 // Written by the bookshelf-echo publisher (SnapshotJob) and synced into public/ by its
 // site-publisher sidecar. Absent on a fresh clone and before the first sync, so
-// the page renders a placeholder rather than failing the build.
-let snap: any = null;
-try {
-  snap = JSON.parse(
-    fs.readFileSync(path.join(process.cwd(), 'public/data/metrics/latest.json'), 'utf-8'),
-  );
-} catch {
-  snap = null;
-}
+// the page renders a placeholder rather than failing the build. Schema-checked
+// in lib/snapshot.ts — a field the publisher renamed shows up as a build-log
+// warning instead of a silently missing panel.
+const snap = await loadSnapshot();
 
 const nf = new Intl.NumberFormat('en-US');
 const num = (n: number) => nf.format(n ?? 0);
@@ -54,15 +48,30 @@ const stateMax = Math.max(1, ...stateRows.map((r) => r.count));
 
 const queues = (snap?.queues ?? []).slice();
 const rank = (n: string) => (WORK_QUEUES.includes(n) ? 0 : n === 'dlq.q' ? 1 : 2);
-queues.sort((a: any, b: any) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
-const queueMax = Math.max(1, ...queues.map((q: any) => q.messages ?? 0));
-const dlqDepth = queues.find((q: any) => q.name === 'dlq.q')?.messages ?? 0;
+queues.sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
+const queueMax = Math.max(1, ...queues.map((q) => q.messages));
+const dlqDepth = queues.find((q) => q.name === 'dlq.q')?.messages ?? 0;
 
 const llm = snap?.llmToday ?? { costUsd: 0, inputTokens: 0, outputTokens: 0, calls: 0 };
 const budget = snap?.limits?.dailyBudgetUsd ?? null;
 const digestLimit = snap?.limits?.dailyDigestLimit ?? null;
 const costRatio = budget ? llm.costUsd / budget : null;
-const digestRatio = digestLimit ? llm.calls / digestLimit : null;
+
+// 花費拆帳：錢花在哪個用途、由哪個模型執行。舊快照沒有這個陣列，整段就不顯示。
+const PURPOSE_LABEL: Record<string, string> = {
+  DIGEST: '逐則摘要',
+  SELECT: '每日選題',
+  JUDGE: '共鳴判定',
+  ESSAY: '每日評析',
+  WEEKLY_ROLLUP: '每週彙整',
+};
+const breakdown = snap?.llmTodayByPurpose ?? [];
+const breakdownMax = Math.max(1e-9, ...breakdown.map((r) => r.costUsd));
+// 摘要配額算的是 DIGEST 呼叫，不是當天所有 LLM 呼叫；有拆帳就用拆帳的數字。
+const digestCalls = breakdown.length
+  ? breakdown.filter((r) => r.purpose === 'DIGEST').reduce((s, r) => s + r.calls, 0)
+  : llm.calls;
+const digestRatio = digestLimit ? digestCalls / digestLimit : null;
 
 const costSev = sev(costRatio);
 const costChip = chipOf(costSev);
@@ -76,6 +85,16 @@ const digestSev = sev(digestRatio);
 const captured = snap?.capturedAt
   ? new Date(snap.capturedAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
   : null;
+
+// 快照新鮮度。publisher 曾在 2026-07-19 靜默停寫 12 小時，而這一頁上的每個數字
+// 看起來都正常——過期的快照長得和健康的一模一樣。頁面自己講出「這份資料多舊」。
+// 注意：這是 build 時算的，頁面重建時才更新。
+const age = snapshotAge(snap?.capturedAt, new Date(), snap?.snapshotIntervalMinutes ?? 60);
+const AGE_TEXT: Record<string, string> = {
+  good: '資料新鮮',
+  warning: '快照過期，publisher 可能落後',
+  critical: '快照停滯，檢查 publisher 是否還活著',
+};
 ---
 
 <Base
@@ -97,7 +116,17 @@ const captured = snap?.capturedAt
   {
     snap && (
       <div class="viz">
-        <p class="captured">快照時間 {captured} · 由 pipeline 定期寫入</p>
+        <p class="captured">
+          快照時間 {captured} · 由 pipeline 每 {snap.snapshotIntervalMinutes} 分鐘寫入
+          {age && (
+            <span class={`chip chip-${age.severity}`}>
+              <span class="ico" aria-hidden="true">
+                {ICON[age.severity]}
+              </span>
+              {humanAge(age.minutes)} · {AGE_TEXT[age.severity]}
+            </span>
+          )}
+        </p>
 
         <section class="card hero">
           <p class="label">今日 LLM 花費</p>
@@ -126,11 +155,52 @@ const captured = snap?.capturedAt
           </p>
         </section>
 
+        {breakdown.length > 0 && (
+          <>
+            <h3>花費拆帳</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>用途</th>
+                    <th>模型</th>
+                    <th class="depth-col">占比</th>
+                    <th class="n">花費</th>
+                    <th class="n">呼叫</th>
+                    <th class="n">tokens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdown.map((r: any) => (
+                    <tr>
+                      <td>{PURPOSE_LABEL[r.purpose] ?? r.purpose}</td>
+                      <td>
+                        <code>{r.model}</code>
+                      </td>
+                      <td class="depth-col">
+                        <span class="qbar" style={`width:${((r.costUsd ?? 0) / breakdownMax) * 100}%`} />
+                      </td>
+                      <td class="n">{usd(r.costUsd)}</td>
+                      <td class="n">{num(r.calls)}</td>
+                      <td class="n">
+                        {compact(r.inputTokens)} / {compact(r.outputTokens)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="foot-note">
+              一天的帳單由誰花掉：便宜的逐則摘要跑數百次，昂貴的每日評析只跑一次，總額看不出差別。tokens 欄為 in / out。
+            </p>
+          </>
+        )}
+
         <div class="kpis">
           <section class="card">
             <p class="label">今日摘要</p>
             <p class="value">
-              {num(llm.calls)}
+              {num(digestCalls)}
               {digestLimit != null && <span class="of"> / {digestLimit}</span>}
             </p>
             {digestRatio != null && (
@@ -260,6 +330,9 @@ const captured = snap?.capturedAt
     color: var(--muted);
     font-size: 0.9rem;
     margin: 0 0 1.25rem;
+  }
+  .captured .chip {
+    margin-left: 0.5rem;
   }
 
   .card {

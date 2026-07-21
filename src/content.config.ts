@@ -31,6 +31,8 @@ const essays = defineCollection({
     title: z.string(),
     date: z.coerce.date(),
     kind: z.string().optional(),
+    // 寫這篇的模型（EssayRenderer 寫入）；改版前的舊 essay 沒有這欄。
+    model: z.string().optional(),
     news: z
       .object({
         title: z.string(),
